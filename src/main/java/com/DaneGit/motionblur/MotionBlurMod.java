@@ -15,7 +15,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
 import org.lwjgl.input.Keyboard;
 
-@Mod(modid = "motionblur", name = "Motion Blur", version = "1.3")
+@Mod(modid = "motionblur", name = "Motion Blur", version = "1.4")
 public class MotionBlurMod {
 
     public static final BlurConfig config = new BlurConfig();

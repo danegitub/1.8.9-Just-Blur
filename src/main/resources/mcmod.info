@@ -1,14 +1,14 @@
 [
 {
-  "modid": "examplemod",
-  "name": "Example Mod",
-  "description": "Example placeholder mod.",
-  "version": "${version}",
-  "mcversion": "${mcversion}",
+  "modid": "motionblur",
+  "name": "Motion Blur",
+  "description": "Simple configurable motion blur effect based on Yqloss Minxin",
+  "version": "${1.2}",
+  "mcversion": "${1.8.9}",
   "url": "",
   "updateUrl": "",
-  "authorList": ["ExampleDude"],
-  "credits": "The Forge and FML guys, for making this example",
+  "authorList": ["DaneGit"],
+  "credits": "",
   "logoFile": "",
   "screenshots": [],
   "dependencies": []
