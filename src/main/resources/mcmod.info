@@ -1,16 +1,16 @@
 [
-{
-  "modid": "motionblur",
-  "name": "Motion Blur",
-  "description": "Simple configurable motion blur effect based on Yqloss Minxin",
-  "version": "${1.2}",
-  "mcversion": "${1.8.9}",
-  "url": "",
-  "updateUrl": "",
-  "authorList": ["DaneGit"],
-  "credits": "",
-  "logoFile": "",
-  "screenshots": [],
-  "dependencies": []
-}
+  {
+    "modid": "motionblur",
+    "name": "Motion Blur",
+    "description": "Simple configurable motion blur effect based of Yqloss Mixin",
+    "version": "1.2",
+    "mcversion": "1.8.9",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["DaneGit"],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
 ]
