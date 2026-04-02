@@ -11,6 +11,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.ChatComponentText;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
@@ -19,6 +20,7 @@ import net.minecraftforge.fml.common.gameevent.InputEvent;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
+import java.io.File;
 import java.io.IOException;
 
 @Mod(modid = "motionblur", name = "Motion Blur", version = "1.0")
@@ -38,6 +40,8 @@ public class MotionBlurMod {
     private KeyBinding toggleKey;
     private KeyBinding guiKey;
 
+    private Configuration config;
+
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(this);
@@ -47,6 +51,38 @@ public class MotionBlurMod {
 
         ClientRegistry.registerKeyBinding(toggleKey);
         ClientRegistry.registerKeyBinding(guiKey);
+
+        // CONFIG SETUP
+        config = new Configuration(new File("config/motionblur.cfg"));
+        loadConfig();
+    }
+
+    private void loadConfig() {
+        try {
+            config.load();
+            strength = config.getFloat(
+                    "strength",
+                    "general",
+                    0.35f,
+                    0.0f,
+                    1.0f,
+                    "Motion blur strength"
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (config.hasChanged()) config.save();
+        }
+    }
+
+    public void saveConfig() {
+        try {
+            config.get("general", "strength", (float) strength).set(strength);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (config.hasChanged()) config.save();
+        }
     }
 
     @SubscribeEvent
@@ -179,6 +215,7 @@ public class MotionBlurMod {
         protected void mouseReleased(int mouseX, int mouseY, int state) {
             super.mouseReleased(mouseX, mouseY, state);
             dragging = false;
+            mod.saveConfig(); // SAVE HERE
         }
 
         @Override
@@ -192,12 +229,12 @@ public class MotionBlurMod {
             if (dragging) {
                 double percent = (double)(mouseX - sliderX) / sliderWidth;
                 percent = Math.max(0.0, Math.min(1.0, percent));
-                mod.strength = percent * 0.7;
+                mod.strength = percent;
             }
 
             drawRect(sliderX, sliderY, sliderX + sliderWidth, sliderY + 20, 0xFF555555);
 
-            int knobX = (int)(sliderX + (mod.strength / 0.7) * sliderWidth);
+            int knobX = (int)(sliderX + mod.strength * sliderWidth);
             drawRect(knobX - 2, sliderY, knobX + 2, sliderY + 20, 0xFFFFFFFF);
 
             drawCenteredString(fontRendererObj,
