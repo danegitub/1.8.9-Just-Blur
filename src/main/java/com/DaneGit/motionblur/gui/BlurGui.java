@@ -7,121 +7,190 @@ import java.io.IOException;
 
 public class BlurGui extends GuiScreen {
 
-    private int sliderX;
-    private int sliderY;
-    private int sliderWidth = 220;
+    private int panelX, panelY, panelW = 260, panelH = 230;
 
-    private double visualStrength; // smooth animation
+    private int sliderX, sliderY, sliderW = 200;
     private boolean dragging = false;
+
+    private int decaySliderY;
+    private boolean draggingDecay = false;
 
     @Override
     public void initGui() {
-        sliderX = width / 2 - sliderWidth / 2;
-        sliderY = height / 2 + 10;
+        panelX = width / 2 - panelW / 2;
+        panelY = height / 2 - panelH / 2;
 
-        visualStrength = MotionBlurMod.config.strength;
+        sliderX = panelX + 30;
+        sliderW = 200;
+
+        // Put sliders BELOW all text rows
+        sliderY = panelY + 165;
+        decaySliderY = panelY + 200;
     }
 
     @Override
-    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
-        super.mouseClicked(mouseX, mouseY, mouseButton);
+    protected void mouseClicked(int mx, int my, int button) throws IOException {
+        super.mouseClicked(mx, my, button);
 
-        if (isHoveringSlider(mouseX, mouseY)) {
-            dragging = true;
+        if (hover(mx, my, panelY + 35)) {
+            MotionBlurMod.config.enabled = !MotionBlurMod.config.enabled;
+            MotionBlurMod.config.save();
+            return;
         }
 
-        // toggle zones (cinematic style, no buttons)
-        if (mouseY > height / 2 - 10 && mouseY < height / 2 + 5) {
-            if (mouseX < width / 2) {
-                MotionBlurMod.config.enabled = !MotionBlurMod.config.enabled;
-            } else {
-                MotionBlurMod.config.useFaithful = !MotionBlurMod.config.useFaithful;
-            }
+        if (hover(mx, my, panelY + 55)) {
+            MotionBlurMod.config.mode++;
+            if (MotionBlurMod.config.mode > 2) MotionBlurMod.config.mode = 0;
+            MotionBlurMod.config.save();
+            return;
         }
 
-        if (mouseY > height / 2 + 40 && mouseY < height / 2 + 55) {
+        if (hover(mx, my, panelY + 75)) {
             MotionBlurMod.config.adaptive = !MotionBlurMod.config.adaptive;
+            MotionBlurMod.config.save();
+            return;
         }
 
+        if (hover(mx, my, panelY + 95)) {
+            MotionBlurMod.config.cameraBased = !MotionBlurMod.config.cameraBased;
+            MotionBlurMod.config.save();
+            return;
+        }
+
+        if (hover(mx, my, panelY + 115)) {
+            MotionBlurMod.config.halfResolution = !MotionBlurMod.config.halfResolution;
+            MotionBlurMod.config.save();
+            return;
+        }
+
+        if (hover(mx, my, panelY + 135)) {
+            MotionBlurMod.config.frameSkipping = !MotionBlurMod.config.frameSkipping;
+            MotionBlurMod.config.save();
+            return;
+        }
+
+        if (hoverSlider(mx, my)) {
+            dragging = true;
+            updateStrength(mx);
+            MotionBlurMod.config.save();
+        }
+
+        if (hoverDecay(mx, my) && MotionBlurMod.config.mode == 2) {
+            draggingDecay = true;
+            updateDecay(mx);
+            MotionBlurMod.config.save();
+        }
+    }
+
+    @Override
+    protected void mouseReleased(int mx, int my, int state) {
+        super.mouseReleased(mx, my, state);
+        dragging = false;
+        draggingDecay = false;
         MotionBlurMod.config.save();
     }
 
     @Override
-    protected void mouseReleased(int mouseX, int mouseY, int state) {
-        super.mouseReleased(mouseX, mouseY, state);
-        dragging = false;
-    }
+    public void drawScreen(int mx, int my, float partialTicks) {
+        drawDefaultBackground();
 
-    @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        drawRect(panelX, panelY, panelX + panelW, panelY + panelH, 0xAA101010);
+        drawCenteredString(fontRendererObj, "Motion Blur", width / 2, panelY + 10, 0xFFFFFF);
 
-        // -------- subtle background (not pure black) --------
-        drawRect(0, 0, width, height, 0xAA101010);
+        drawRow("Enabled", MotionBlurMod.config.enabled, panelY + 35);
+        drawMode(panelY + 55);
+        drawRow("Adaptive", MotionBlurMod.config.adaptive, panelY + 75);
+        drawRow("Camera Based", MotionBlurMod.config.cameraBased, panelY + 95);
+        drawRow("Half Resolution", MotionBlurMod.config.halfResolution, panelY + 115);
+        drawRow("Frame Skipping", MotionBlurMod.config.frameSkipping, panelY + 135);
 
-        // -------- smooth slider animation --------
-        visualStrength += (MotionBlurMod.config.strength - visualStrength) * 0.15;
-
-        // -------- title --------
-        drawCenteredString(fontRendererObj,
-                "Motion Blur",
-                width / 2,
-                height / 2 - 60,
-                0xFFFFFF);
-
-        // -------- toggles (clean text layout) --------
-        drawCenteredString(fontRendererObj,
-                "Enabled: " + (MotionBlurMod.config.enabled ? "ON" : "OFF"),
-                width / 2 - 80,
-                height / 2 - 5,
-                MotionBlurMod.config.enabled ? 0x55FF55 : 0xFF5555);
-
-        drawCenteredString(fontRendererObj,
-                "Mode: " + (MotionBlurMod.config.useFaithful ? "Faithful" : "Basic"),
-                width / 2 + 80,
-                height / 2 - 5,
-                0xAAAAFF);
-
-        drawCenteredString(fontRendererObj,
-                "Adaptive: " + (MotionBlurMod.config.adaptive ? "ON" : "OFF"),
-                width / 2,
-                height / 2 + 45,
-                0xFFFFFF);
-
-        // -------- slider logic --------
+        // Strength slider
         if (dragging) {
-            double percent = (double)(mouseX - sliderX) / sliderWidth;
-            percent = clamp(percent);
-
-            MotionBlurMod.config.strength = percent;
+            updateStrength(mx);
         }
 
-        // -------- slider background --------
-        drawRect(sliderX, sliderY, sliderX + sliderWidth, sliderY + 4, 0xFF333333);
-
-        // -------- animated fill --------
-        int fill = (int)(sliderX + visualStrength * sliderWidth);
-        drawRect(sliderX, sliderY, fill, sliderY + 4, 0xFFFFFFFF);
-
-        // -------- knob --------
-        drawRect(fill - 2, sliderY - 2, fill + 2, sliderY + 6, 0xFFFFFFFF);
-
-        // -------- value text --------
         drawCenteredString(fontRendererObj,
-                "Strength: " + format(visualStrength),
+                "Strength: " + format(MotionBlurMod.config.strength),
                 width / 2,
                 sliderY - 12,
                 0xDDDDDD);
 
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        drawRect(sliderX, sliderY, sliderX + sliderW, sliderY + 4, 0xFF333333);
+
+        int fill = (int) (sliderX + MotionBlurMod.config.strength * sliderW);
+        drawRect(sliderX, sliderY, fill, sliderY + 4, 0xFFFFFFFF);
+
+        // Decay slider only for Accumulation
+        if (MotionBlurMod.config.mode == 2) {
+            if (draggingDecay) {
+                updateDecay(mx);
+            }
+
+            drawCenteredString(fontRendererObj,
+                    "Persistence: " + format(MotionBlurMod.config.accumulationDecay),
+                    width / 2,
+                    decaySliderY - 12,
+                    0xDDDDDD);
+
+            drawRect(sliderX, decaySliderY, sliderX + sliderW, decaySliderY + 4, 0xFF333333);
+
+            double percent = (MotionBlurMod.config.accumulationDecay - 0.04) / 0.12;
+            percent = clamp(percent);
+            int fill2 = (int) (sliderX + percent * sliderW);
+
+            drawRect(sliderX, decaySliderY, fill2, decaySliderY + 4, 0xFFFFFFFF);
+        }
+
+        super.drawScreen(mx, my, partialTicks);
     }
 
-    private boolean isHoveringSlider(int mouseX, int mouseY) {
-        return mouseX >= sliderX && mouseX <= sliderX + sliderWidth
-                && mouseY >= sliderY - 4 && mouseY <= sliderY + 8;
+    private void drawRow(String name, boolean state, int y) {
+        drawCenteredString(fontRendererObj,
+                name + ": " + (state ? "ON" : "OFF"),
+                width / 2,
+                y,
+                state ? 0x55FF55 : 0xFF5555);
+    }
+
+    private void drawMode(int y) {
+        String name = "Basic";
+        if (MotionBlurMod.config.mode == 1) name = "Faithful";
+        if (MotionBlurMod.config.mode == 2) name = "Accumulation";
+
+        drawCenteredString(fontRendererObj,
+                "Mode: " + name,
+                width / 2,
+                y,
+                0xAAAAFF);
+    }
+
+    private boolean hover(int mx, int my, int y) {
+        return mx > panelX && mx < panelX + panelW && my > y - 2 && my < y + 10;
+    }
+
+    private boolean hoverSlider(int mx, int my) {
+        return mx >= sliderX && mx <= sliderX + sliderW
+                && my >= sliderY - 4 && my <= sliderY + 8;
+    }
+
+    private boolean hoverDecay(int mx, int my) {
+        return mx >= sliderX && mx <= sliderX + sliderW
+                && my >= decaySliderY - 4 && my <= decaySliderY + 8;
+    }
+
+    private void updateStrength(int mx) {
+        double p = (mx - sliderX) / (double) sliderW;
+        MotionBlurMod.config.strength = clamp(p);
+    }
+
+    private void updateDecay(int mx) {
+        double p = (mx - sliderX) / (double) sliderW;
+        p = clamp(p);
+        MotionBlurMod.config.accumulationDecay = 0.04 + p * 0.12;
     }
 
     private double clamp(double v) {
-        return Math.max(0.0, Math.min(1.0, v));
+        return Math.max(0, Math.min(1, v));
     }
 
     private String format(double v) {

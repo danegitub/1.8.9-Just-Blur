@@ -1,6 +1,7 @@
 package com.DaneGit.motionblur.render;
 
 import com.DaneGit.motionblur.MotionBlurMod;
+import com.DaneGit.motionblur.gui.BlurGui;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -19,53 +20,65 @@ public class BasicBlurRenderer {
     private static int width = -1;
     private static int height = -1;
 
-    public static void render() {
+    private static int refreshFrame = 0;
 
-        if (!MotionBlurMod.config.enabled) return;
+    private static long lastFpsUpdate = 0L;
+    private static int cachedFps = 60;
+
+    private static float lastYaw = 0.0F;
+    private static float lastPitch = 0.0F;
+
+    public void render() {
+        if (Minecraft.getDebugFPS() < 35) return;
         if (mc.theWorld == null || mc.thePlayer == null) return;
+        if (mc.currentScreen != null && !(mc.currentScreen instanceof BlurGui)) return;
 
         int w = mc.displayWidth;
         int h = mc.displayHeight;
 
-        if (texture == -1 || w != width || h != height) {
+        if (texture == -1 || width != w || height != h) {
+            if (texture != -1) {
+                GlStateManager.deleteTexture(texture);
+            }
+
             texture = GlStateManager.generateTexture();
-            setup(texture, w, h);
             width = w;
             height = h;
 
-            copy(texture, w, h);
+            setup(texture, width, height);
+            copy();
+            updateCameraHistory();
             return;
         }
 
-        double strength = getAdaptive(MotionBlurMod.config.strength);
-        strength = clamp(strength, 0.0, 0.65);
+        double motion = getMotion();
+        float cameraDelta = getCameraDelta();
 
-        draw(texture, strength);
-
-        copy(texture, w, h);
-    }
-
-    private static double getAdaptive(double base) {
-        if (!MotionBlurMod.config.adaptive) return base;
-
-        int fps = Minecraft.getDebugFPS();
-        double fpsFactor = fps <= 0 ? 1.0 : Math.min(1.0, fps / 120.0);
-
-        double motion = 0;
-        if (mc.thePlayer != null) {
-            motion = Math.abs(mc.thePlayer.motionX)
-                   + Math.abs(mc.thePlayer.motionY)
-                   + Math.abs(mc.thePlayer.motionZ);
+        if (motion < 0.01D && !MotionBlurMod.config.cameraBased) {
+            return;
         }
 
-        double moveFactor = Math.min(1.0, motion * 8.0);
+        if (cameraDelta < 0.10F && !MotionBlurMod.config.adaptive && motion < 0.01D) {
+            return;
+        }
 
-        return base * (0.5 + moveFactor * 0.5) * fpsFactor;
+        double alpha = getStrength(motion, cameraDelta);
+        if (alpha < 0.02D) {
+            if (shouldRefreshBuffer()) {
+                copy();
+            }
+            return;
+        }
+
+        draw(texture, alpha);
+
+        if (shouldRefreshBuffer()) {
+            copy();
+        }
     }
 
     private static void setup(int tex, int w, int h) {
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
-
         GL11.glTexImage2D(
                 GL11.GL_TEXTURE_2D,
                 0,
@@ -75,51 +88,139 @@ public class BasicBlurRenderer {
                 0,
                 GL11.GL_RGB,
                 GL11.GL_UNSIGNED_BYTE,
-                (ByteBuffer) null // FIXED
+                (ByteBuffer) null
         );
 
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
     }
 
-    private static void copy(int tex, int w, int h) {
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
-        GL11.glCopyTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+    private static void copy() {
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
+        GL11.glCopyTexSubImage2D(
+                GL11.GL_TEXTURE_2D,
+                0,
+                0,
+                0,
+                0,
+                0,
+                width,
+                height
+        );
     }
 
     private static void draw(int tex, double alpha) {
-        if (tex == -1) return;
-
         ScaledResolution sr = new ScaledResolution(mc);
-        double w = sr.getScaledWidth_double();
-        double h = sr.getScaledHeight_double();
+        double sw = sr.getScaledWidth_double();
+        double sh = sr.getScaledHeight_double();
 
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GlStateManager.pushMatrix();
-
         mc.entityRenderer.setupOverlayRendering();
 
-        GL11.glEnable(GL11.GL_BLEND);
+        GlStateManager.disableDepth();
+        GlStateManager.depthMask(false);
+        GlStateManager.enableBlend();
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
 
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
-        GL11.glColor4d(1, 1, 1, alpha);
+        GL11.glColor4d(1.0D, 1.0D, 1.0D, alpha);
 
         Tessellator t = Tessellator.getInstance();
         WorldRenderer wr = t.getWorldRenderer();
 
         wr.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX);
-        wr.pos(0, h, 0).tex(0, 0).endVertex();
-        wr.pos(w, h, 0).tex(1, 0).endVertex();
-        wr.pos(w, 0, 0).tex(1, 1).endVertex();
-        wr.pos(0, 0, 0).tex(0, 1).endVertex();
+        wr.pos(0.0D, sh, 0.0D).tex(0.0D, 0.0D).endVertex();
+        wr.pos(sw, sh, 0.0D).tex(1.0D, 0.0D).endVertex();
+        wr.pos(sw, 0.0D, 0.0D).tex(1.0D, 1.0D).endVertex();
+        wr.pos(0.0D, 0.0D, 0.0D).tex(0.0D, 1.0D).endVertex();
         t.draw();
 
-        GL11.glColor4d(1, 1, 1, 1);
+        GL11.glColor4d(1.0D, 1.0D, 1.0D, 1.0D);
+        GlStateManager.disableBlend();
+        GlStateManager.depthMask(true);
+        GlStateManager.enableDepth();
 
         GlStateManager.popMatrix();
-        GL11.glPopAttrib();
+    }
+
+    private static double getStrength(double motion, float cameraDelta) {
+        double strength = MotionBlurMod.config.strength;
+
+        if (MotionBlurMod.config.adaptive) {
+            double fpsFactor = Math.min(1.0D, getFps() / 120.0D);
+            double moveFactor = Math.min(1.0D, motion * 8.0D);
+            double cameraFactor = MotionBlurMod.config.cameraBased ? Math.min(1.0D, cameraDelta / 30.0D) : 0.0D;
+
+            strength = strength * (0.40D + moveFactor * 0.40D + cameraFactor * 0.20D) * fpsFactor;
+        } else if (MotionBlurMod.config.cameraBased) {
+            strength = strength * (0.75D + Math.min(1.0D, cameraDelta / 30.0D) * 0.25D);
+        }
+
+        if (mc.currentScreen != null) {
+            strength *= 0.75D;
+        }
+
+        if (MotionBlurMod.config.halfResolution) {
+            strength *= 0.92D;
+        }
+
+        return clamp(strength, 0.0D, 0.70D);
+    }
+
+    private static boolean shouldRefreshBuffer() {
+        int fps = getFps();
+        int interval = 1;
+
+        if (MotionBlurMod.config.frameSkipping) {
+            if (fps < 25) interval = 4;
+            else if (fps < 40) interval = 3;
+            else if (fps < 60) interval = 2;
+        }
+
+        if (MotionBlurMod.config.halfResolution) {
+            interval = Math.max(interval, 2);
+        }
+
+        return (refreshFrame++ % interval) == 0;
+    }
+
+    private static int getFps() {
+        long now = System.currentTimeMillis();
+        if (now - lastFpsUpdate > 200L) {
+            cachedFps = Minecraft.getDebugFPS();
+            lastFpsUpdate = now;
+        }
+        return cachedFps <= 0 ? 60 : cachedFps;
+    }
+
+    private static double getMotion() {
+        return Math.abs(mc.thePlayer.motionX)
+                + Math.abs(mc.thePlayer.motionY)
+                + Math.abs(mc.thePlayer.motionZ);
+    }
+
+    private static float getCameraDelta() {
+        float yaw = mc.thePlayer.rotationYaw;
+        float pitch = mc.thePlayer.rotationPitch;
+
+        float dy = Math.abs(wrapAngleTo180(yaw - lastYaw));
+        float dp = Math.abs(pitch - lastPitch);
+
+        lastYaw = yaw;
+        lastPitch = pitch;
+
+        return dy + dp;
+    }
+
+    private static void updateCameraHistory() {
+        lastYaw = mc.thePlayer.rotationYaw;
+        lastPitch = mc.thePlayer.rotationPitch;
+    }
+
+    private static float wrapAngleTo180(float angle) {
+        while (angle >= 180.0F) angle -= 360.0F;
+        while (angle < -180.0F) angle += 360.0F;
+        return angle;
     }
 
     private static double clamp(double v, double min, double max) {

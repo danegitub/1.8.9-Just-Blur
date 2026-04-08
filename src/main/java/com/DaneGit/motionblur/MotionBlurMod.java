@@ -2,6 +2,7 @@ package com.DaneGit.motionblur;
 
 import com.DaneGit.motionblur.config.BlurConfig;
 import com.DaneGit.motionblur.gui.BlurGui;
+import com.DaneGit.motionblur.render.AccumulationBlurRenderer;
 import com.DaneGit.motionblur.render.BasicBlurRenderer;
 import com.DaneGit.motionblur.render.FaithfulBlurRenderer;
 import net.minecraft.client.Minecraft;
@@ -22,6 +23,7 @@ public class MotionBlurMod {
 
     private static final BasicBlurRenderer BASIC = new BasicBlurRenderer();
     private static final FaithfulBlurRenderer FAITHFUL = new FaithfulBlurRenderer();
+    private static final AccumulationBlurRenderer ACCUM = new AccumulationBlurRenderer();
 
     private KeyBinding toggleKey;
     private KeyBinding guiKey;
@@ -56,11 +58,18 @@ public class MotionBlurMod {
         if (!config.enabled) return;
         if (event.type != RenderGameOverlayEvent.ElementType.ALL) return;
 
-        // FIXED: removed event argument
-        if (config.useFaithful) {
-            FAITHFUL.render();
-        } else {
-            BASIC.render();
+        switch (config.mode) {
+            case 1:
+                FAITHFUL.render();
+                break;
+
+            case 2:
+                ACCUM.render();
+                break;
+
+            default:
+                BASIC.render();
+                break;
         }
     }
 }

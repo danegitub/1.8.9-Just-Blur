@@ -7,8 +7,16 @@ public class BlurConfig {
     public boolean enabled = true;
     public double strength = 0.35;
 
-    public boolean useFaithful = false;
+    // 0 = Basic, 1 = Faithful, 2 = Accumulation
+    public int mode = 0;
+
     public boolean adaptive = false;
+    public boolean cameraBased = false;
+
+    public boolean halfResolution = false;
+    public boolean frameSkipping = false;
+
+    public double accumulationDecay = 0.08;
 
     private final File file = new File("config/motionblur.cfg");
 
@@ -16,38 +24,48 @@ public class BlurConfig {
         try {
             if (!file.exists()) return;
 
-            BufferedReader reader = new BufferedReader(new FileReader(file));
+            BufferedReader r = new BufferedReader(new FileReader(file));
 
-            String s1 = reader.readLine();
-            String s2 = reader.readLine();
-            String s3 = reader.readLine();
-            String s4 = reader.readLine();
+            strength = Double.parseDouble(r.readLine());
+            enabled = Boolean.parseBoolean(r.readLine());
+            mode = Integer.parseInt(r.readLine());
+            adaptive = Boolean.parseBoolean(r.readLine());
+            cameraBased = Boolean.parseBoolean(r.readLine());
+            halfResolution = Boolean.parseBoolean(r.readLine());
+            frameSkipping = Boolean.parseBoolean(r.readLine());
+            accumulationDecay = Double.parseDouble(r.readLine());
 
-            reader.close();
+            r.close();
 
-            if (s1 != null) strength = Double.parseDouble(s1);
-            if (s2 != null) enabled = Boolean.parseBoolean(s2);
-            if (s3 != null) useFaithful = Boolean.parseBoolean(s3);
-            if (s4 != null) adaptive = Boolean.parseBoolean(s4);
+            strength = clamp(strength, 0.0, 1.0);
+            accumulationDecay = clamp(accumulationDecay, 0.04, 0.16);
 
+            if (mode < 0 || mode > 2) {
+                mode = 0;
+            }
         } catch (Exception ignored) {}
     }
 
     public void save() {
         try {
-            if (!file.getParentFile().exists()) {
-                file.getParentFile().mkdirs();
-            }
+            if (!file.getParentFile().exists()) file.getParentFile().mkdirs();
 
-            BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+            BufferedWriter w = new BufferedWriter(new FileWriter(file));
 
-            writer.write(String.valueOf(strength)); writer.newLine();
-            writer.write(String.valueOf(enabled)); writer.newLine();
-            writer.write(String.valueOf(useFaithful)); writer.newLine();
-            writer.write(String.valueOf(adaptive));
+            w.write(String.valueOf(strength)); w.newLine();
+            w.write(String.valueOf(enabled)); w.newLine();
+            w.write(String.valueOf(mode)); w.newLine();
+            w.write(String.valueOf(adaptive)); w.newLine();
+            w.write(String.valueOf(cameraBased)); w.newLine();
+            w.write(String.valueOf(halfResolution)); w.newLine();
+            w.write(String.valueOf(frameSkipping)); w.newLine();
+            w.write(String.valueOf(accumulationDecay));
 
-            writer.close();
-
+            w.close();
         } catch (Exception ignored) {}
+    }
+
+    private double clamp(double v, double min, double max) {
+        return Math.max(min, Math.min(max, v));
     }
 }
